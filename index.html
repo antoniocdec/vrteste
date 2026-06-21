@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR Box Fixed</title>
+<title>VR Box OK</title>
 
 <style>
 body { margin: 0; overflow: hidden; background: black; }
@@ -15,95 +15,91 @@ canvas { display: block; }
 <body>
 
 <script>
+
 // ===== CENA =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
-// renderer (IMPORTANTE: alpha false evita tela branca bugada)
+// renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// câmeras (olho esquerdo/direito)
-const cameraL = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-const cameraR = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+// câmeras
+const cameraL = new THREE.PerspectiveCamera(70, 0.5, 0.1, 100);
+const cameraR = new THREE.PerspectiveCamera(70, 0.5, 0.1, 100);
 
-// chão
+// chão (IMPORTANTE: mais próximo)
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(30, 30),
-  new THREE.MeshBasicMaterial({ color: 0x555555 })
+  new THREE.PlaneGeometry(50, 50),
+  new THREE.MeshBasicMaterial({ color: 0x444444 })
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// parede
+// parede (MUITO IMPORTANTE: mais perto!)
 const wall = new THREE.Mesh(
   new THREE.PlaneGeometry(10, 5),
-  new THREE.MeshBasicMaterial({ color: 0xdddddd })
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
 );
-wall.position.set(0, 2.5, -6);
+wall.position.set(0, 2, -4);
 scene.add(wall);
 
-// objetos (símbolos)
+// objetos bem próximos da câmera
 function box(x, color) {
   const m = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 0.8, 0.2),
+    new THREE.BoxGeometry(0.8, 0.8, 0.8),
     new THREE.MeshBasicMaterial({ color })
   );
-  m.position.set(x, 2, -5);
+  m.position.set(x, 2, -3);
   scene.add(m);
 }
 
-box(-2.5, 0xff0000);
+box(-2, 0xff0000);
 box(0, 0x0000ff);
-box(2.5, 0x00ff00);
+box(2, 0x00ff00);
 
 // giroscópio
-let alpha = 0, beta = 0;
+let alpha = 0;
 
 window.addEventListener("deviceorientation", (e) => {
   alpha = e.alpha || 0;
-  beta = e.beta || 0;
 });
 
 // distância entre olhos
-const eye = 0.06;
+const eye = 0.05;
 
 // loop
 function animate() {
   requestAnimationFrame(animate);
 
-  const yaw = THREE.MathUtils.degToRad(alpha);
-  const pitch = THREE.MathUtils.degToRad(beta);
+  const rotY = THREE.MathUtils.degToRad(alpha);
 
   const base = new THREE.Vector3(0, 1.6, 0);
 
-  const right = new THREE.Vector3(eye, 0, 0);
-  const left = new THREE.Vector3(-eye, 0, 0);
+  const leftEye = new THREE.Vector3(-eye, 0, 0);
+  const rightEye = new THREE.Vector3(eye, 0, 0);
 
-  const rot = new THREE.Matrix4().makeRotationY(yaw);
+  const rot = new THREE.Matrix4().makeRotationY(rotY);
 
-  const camLPos = left.clone().applyMatrix4(rot).add(base);
-  const camRPos = right.clone().applyMatrix4(rot).add(base);
+  cameraL.position.copy(leftEye.clone().applyMatrix4(rot).add(base));
+  cameraR.position.copy(rightEye.clone().applyMatrix4(rot).add(base));
 
-  cameraL.position.copy(camLPos);
-  cameraR.position.copy(camRPos);
+  cameraL.lookAt(0, 1.6, -3);
+  cameraR.lookAt(0, 1.6, -3);
 
-  cameraL.lookAt(base);
-  cameraR.lookAt(base);
-
-  // IMPORTANTE: render separado sem scissor (evita tela branca)
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  renderer.setViewport(0, 0, w / 2, h);
+  renderer.setViewport(0, 0, w/2, h);
   renderer.render(scene, cameraL);
 
-  renderer.setViewport(w / 2, 0, w / 2, h);
+  renderer.setViewport(w/2, 0, w/2, h);
   renderer.render(scene, cameraR);
 }
 
 animate();
+
 </script>
 
 </body>
