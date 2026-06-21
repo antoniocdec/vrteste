@@ -2,119 +2,107 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR Auto Box Game</title>
+<title>VR Box Split Screen</title>
 
-<script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+}
 
-<script>
-// Componente de seleção por olhar
-AFRAME.registerComponent('gaze', {
-  init: function () {
-    let timer;
+/* duas telas lado a lado */
+.half {
+  width: 50vw;
+  height: 100vh;
+  float: left;
+}
+canvas {
+  display: block;
+}
+</style>
 
-    this.el.addEventListener('mouseenter', () => {
-      timer = setTimeout(() => {
-        this.el.setAttribute('color', '#FFD700');
-
-        let scoreEl = document.querySelector('#score');
-        let pontos = parseInt(scoreEl.getAttribute('value'));
-        pontos++;
-        scoreEl.setAttribute('value', pontos);
-
-        // reposiciona o alvo
-        this.el.setAttribute('position', {
-          x: (Math.random() * 6) - 3,
-          y: 1 + Math.random() * 2,
-          z: -4 - Math.random() * 3
-        });
-
-      }, 2000);
-    });
-
-    this.el.addEventListener('mouseleave', () => {
-      clearTimeout(timer);
-    });
-  }
-});
-</script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r155/three.min.js"></script>
 </head>
 
 <body>
 
-<a-scene vr-mode-ui="enabled: true" embedded>
-
-  <!-- Força ambiente VR (melhor para VR Box) -->
-  <a-entity camera look-controls position="0 1.6 0">
-
-    <!-- Mira fixa no centro -->
-    <a-ring radius-inner="0.01"
-            radius-outer="0.02"
-            color="white"
-            position="0 0 -1">
-    </a-ring>
-
-  </a-entity>
-
-  <!-- Céu -->
-  <a-sky color="#87CEEB"></a-sky>
-
-  <!-- Chão -->
-  <a-plane rotation="-90 0 0"
-           width="20"
-           height="20"
-           color="#666">
-  </a-plane>
-
-  <!-- Luz -->
-  <a-light type="ambient" intensity="1"></a-light>
-
-  <!-- Painel de pontuação -->
-  <a-plane position="0 3 -4"
-           width="2"
-           height="0.6"
-           color="white">
-  </a-plane>
-
-  <a-text id="score"
-          value="0"
-          color="black"
-          align="center"
-          position="0 3 -3.9">
-  </a-text>
-
-  <!-- PAREDE DE SÍMBOLOS -->
-  <a-box gaze position="-2 1.5 -4"
-         color="red">
-  </a-box>
-
-  <a-sphere gaze position="0 1.5 -4"
-            radius="0.4"
-            color="blue">
-  </a-sphere>
-
-  <a-cylinder gaze position="2 1.5 -4"
-              radius="0.3"
-              height="0.8"
-              color="green">
-  </a-cylinder>
-
-  <a-cone gaze position="0 2.8 -5"
-          radius-bottom="0.4"
-          height="0.8"
-          color="orange">
-  </a-cone>
-
-</a-scene>
+<div id="left" class="half"></div>
+<div id="right" class="half"></div>
 
 <script>
-// tenta forçar fullscreen automaticamente
-window.onload = () => {
-  const scene = document.querySelector('a-scene');
-  if (scene.requestFullscreen) {
-    scene.requestFullscreen().catch(()=>{});
-  }
-};
+// ===== CENA =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+
+// câmera esquerda e direita
+const cameraL = new THREE.PerspectiveCamera(75, 0.5, 0.1, 100);
+const cameraR = new THREE.PerspectiveCamera(75, 0.5, 0.1, 100);
+
+// renderer
+const rendererL = new THREE.WebGLRenderer();
+rendererL.setSize(window.innerWidth/2, window.innerHeight);
+document.getElementById("left").appendChild(rendererL.domElement);
+
+const rendererR = new THREE.WebGLRenderer();
+rendererR.setSize(window.innerWidth/2, window.innerHeight);
+document.getElementById("right").appendChild(rendererR.domElement);
+
+// chão
+const floorGeo = new THREE.PlaneGeometry(20,20);
+const floorMat = new THREE.MeshBasicMaterial({color:0x555555});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+// parede
+const wallGeo = new THREE.PlaneGeometry(10,5);
+const wallMat = new THREE.MeshBasicMaterial({color:0xdddddd});
+const wall = new THREE.Mesh(wallGeo, wallMat);
+wall.position.z = -5;
+wall.position.y = 2.5;
+scene.add(wall);
+
+// símbolos
+function box(x,color){
+  const geo = new THREE.BoxGeometry(0.8,0.8,0.2);
+  const mat = new THREE.MeshBasicMaterial({color});
+  const mesh = new THREE.Mesh(geo,mat);
+  mesh.position.set(x,2,-4.8);
+  scene.add(mesh);
+}
+
+box(-3,0xff0000);
+box(0,0x0000ff);
+box(3,0x00ff00);
+
+// giroscópio
+let alpha = 0, beta = 0;
+
+window.addEventListener("deviceorientation", (e)=>{
+  alpha = e.alpha || 0;
+  beta = e.beta || 0;
+});
+
+// animação
+function animate(){
+  requestAnimationFrame(animate);
+
+  // movimento da cabeça
+  cameraL.position.set(0,1.6,0);
+  cameraR.position.set(0,1.6,0);
+
+  cameraL.rotation.y = THREE.MathUtils.degToRad(alpha);
+  cameraR.rotation.y = THREE.MathUtils.degToRad(alpha);
+
+  cameraL.rotation.x = THREE.MathUtils.degToRad(beta);
+  cameraR.rotation.x = THREE.MathUtils.degToRad(beta);
+
+  rendererL.render(scene, cameraL);
+  rendererR.render(scene, cameraR);
+}
+
+animate();
 </script>
 
 </body>
