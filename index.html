@@ -2,24 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR Box Split Screen</title>
+<title>VR Box 3D Real</title>
 
 <style>
-body {
-  margin: 0;
-  overflow: hidden;
-  background: black;
-}
-
-/* duas telas lado a lado */
-.half {
-  width: 50vw;
-  height: 100vh;
-  float: left;
-}
-canvas {
-  display: block;
-}
+body { margin: 0; overflow: hidden; }
+canvas { display: block; }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r155/three.min.js"></script>
@@ -27,79 +14,101 @@ canvas {
 
 <body>
 
-<div id="left" class="half"></div>
-<div id="right" class="half"></div>
-
 <script>
 // ===== CENA =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
-// câmera esquerda e direita
+// renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// parâmetros VR
+const eyeDistance = 0.06; // distância entre olhos
+
+// câmeras
 const cameraL = new THREE.PerspectiveCamera(75, 0.5, 0.1, 100);
 const cameraR = new THREE.PerspectiveCamera(75, 0.5, 0.1, 100);
 
-// renderer
-const rendererL = new THREE.WebGLRenderer();
-rendererL.setSize(window.innerWidth/2, window.innerHeight);
-document.getElementById("left").appendChild(rendererL.domElement);
-
-const rendererR = new THREE.WebGLRenderer();
-rendererR.setSize(window.innerWidth/2, window.innerHeight);
-document.getElementById("right").appendChild(rendererR.domElement);
-
 // chão
-const floorGeo = new THREE.PlaneGeometry(20,20);
-const floorMat = new THREE.MeshBasicMaterial({color:0x555555});
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI/2;
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshBasicMaterial({ color: 0x555555 })
+);
+floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
 // parede
-const wallGeo = new THREE.PlaneGeometry(10,5);
-const wallMat = new THREE.MeshBasicMaterial({color:0xdddddd});
-const wall = new THREE.Mesh(wallGeo, wallMat);
-wall.position.z = -5;
-wall.position.y = 2.5;
+const wall = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 5),
+  new THREE.MeshBasicMaterial({ color: 0xdddddd })
+);
+wall.position.set(0, 2.5, -6);
 scene.add(wall);
 
-// símbolos
-function box(x,color){
-  const geo = new THREE.BoxGeometry(0.8,0.8,0.2);
-  const mat = new THREE.MeshBasicMaterial({color});
-  const mesh = new THREE.Mesh(geo,mat);
-  mesh.position.set(x,2,-4.8);
+// objetos (símbolos)
+function addBox(x, color) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.8, 0.2),
+    new THREE.MeshBasicMaterial({ color })
+  );
+  mesh.position.set(x, 2, -5.5);
   scene.add(mesh);
 }
 
-box(-3,0xff0000);
-box(0,0x0000ff);
-box(3,0x00ff00);
+addBox(-2.5, 0xff0000);
+addBox(0, 0x0000ff);
+addBox(2.5, 0x00ff00);
 
 // giroscópio
 let alpha = 0, beta = 0;
 
-window.addEventListener("deviceorientation", (e)=>{
+window.addEventListener("deviceorientation", (e) => {
   alpha = e.alpha || 0;
   beta = e.beta || 0;
 });
 
-// animação
-function animate(){
+// render loop
+function animate() {
   requestAnimationFrame(animate);
 
-  // movimento da cabeça
-  cameraL.position.set(0,1.6,0);
-  cameraR.position.set(0,1.6,0);
+  const rotY = THREE.MathUtils.degToRad(alpha);
+  const rotX = THREE.MathUtils.degToRad(beta);
 
-  cameraL.rotation.y = THREE.MathUtils.degToRad(alpha);
-  cameraR.rotation.y = THREE.MathUtils.degToRad(alpha);
+  // posição base (centro dos olhos)
+  const base = new THREE.Vector3(0, 1.6, 0);
 
-  cameraL.rotation.x = THREE.MathUtils.degToRad(beta);
-  cameraR.rotation.x = THREE.MathUtils.degToRad(beta);
+  // deslocamento lateral dos olhos
+  const right = new THREE.Vector3(eyeDistance, 0, 0);
+  const left = new THREE.Vector3(-eyeDistance, 0, 0);
 
-  rendererL.render(scene, cameraL);
-  rendererR.render(scene, cameraR);
+  // aplicar rotação do corpo
+  const rotMatrix = new THREE.Matrix4().makeRotationY(rotY);
+
+  const camLPos = left.clone().applyMatrix4(rotMatrix).add(base);
+  const camRPos = right.clone().applyMatrix4(rotMatrix).add(base);
+
+  cameraL.position.copy(camLPos);
+  cameraR.position.copy(camRPos);
+
+  cameraL.lookAt(base);
+  cameraR.lookAt(base);
+
+  cameraL.rotation.x += rotX;
+  cameraR.rotation.x += rotX;
+
+  // render lado esquerdo
+  renderer.setScissorTest(true);
+
+  renderer.setViewport(0, 0, window.innerWidth / 2, window.innerHeight);
+  renderer.setScissor(0, 0, window.innerWidth / 2, window.innerHeight);
+  renderer.render(scene, cameraL);
+
+  // render lado direito
+  renderer.setViewport(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
+  renderer.setScissor(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
+  renderer.render(scene, cameraR);
 }
 
 animate();
